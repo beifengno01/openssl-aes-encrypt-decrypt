@@ -13,7 +13,8 @@ import std.array;
 void main()
 {
 	writeln(aes256Decrypt(aes256Encrypt()));
-	rsa256Encrypt();
+	rsa256SignPrivateKey();
+	rsa256VerifyPublicKey();
 }
 
 string aes256Decrypt(string encode)
@@ -57,9 +58,9 @@ string aes256Encrypt()
 	//return cast(string) out_;
 }
 
-void rsa256Encrypt()
+void rsa256SignPrivateKey()
 {
-	string msg = `app_id=2016080300154304&biz_content={"body":"red apple made in China","out_trade_no":"1490953569","passback_params":"[]","product_code":"QUICK_MSECURITY_PAY","subject":"red apple","total_amount":"1"}&charset=utf-8&format=JSON&method=alipay.trade.app.pay&notify_url=https://spay,putao.com/api/pay/callbak/alipay/c1d4d06048ed7342726955367350baba&sign_type=RSA2&timestamp=2017-03-31 17:46:09&version=1.0`;
+	string msg = `hello world`;
 	string privateKey = "-----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEA0+1jZB4ed581nQoNkwp0mPQvKYfJbBGNAEbdGIAL1+ZD2Ouk
 iUdWiHc8wWXDiPyif+yOCAY6b65aB4que/xAeTbkbu0igI7QTS77UoEiocLtCjnI
@@ -97,8 +98,42 @@ Bo8zL3dIN4Vmfw3zkEHW8RN7NmG78E0rCmfE4k83AwS+qYENp9uIAu4=
 	uint siglen = RSA_size(rsa);
 	ubyte[] sigret = new ubyte[siglen];
 	// 标准PKCS#1 v1.5 RSA RSA_PKCS1_PADDING
-	RSA_sign(NID_sha256, hash256.ptr,cast(uint)SHA256_DIGEST_LENGTH, sigret.ptr, &siglen, rsa);
+	auto status = RSA_sign(NID_sha256, hash256.ptr,cast(uint)SHA256_DIGEST_LENGTH, sigret.ptr, &siglen, rsa);
+	assert(status == 1, "sign error");
 	writeln("string:", Base64.encode(sigret));
+	RSA_free(rsa);
+	BIO_free(bio);
+}
+
+
+void rsa256VerifyPublicKey()
+{
+	string encryptedMsg = `BM8zYgJIjmSYzAmBb3dmFVuaU+7QK/IYmbym7FeRAz7l4WRRxhKygdwN4qIFeRrkVuhwVqMRQU6p7oqaQji0qATdBJbSkxplCTUsL4W8WdVgsfE6AJKPbeBD1fKu8YqJijV5QlQNHj36y2RfAv5Na5f4yHugM3X1LoY7+jmQN7aycOQna+/xlDaFIgssMOIgXdNDmCkfaHbTJybNbIyeM/IrU/VOuDEG4nu3UTxCiso/9cdttoVR4ts6toTv4QzEWDUFQKCa843W1ZVDgKPqcHVqRByNjJsZL+fKQpGOZnTS/a9yalxrUUHgh1LX5wN0nEIKlcF4ov0eCDJ2pZz8zg==`;
+	string msg = `hello world`;
+	string publicKey = "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0+1jZB4ed581nQoNkwp0
+mPQvKYfJbBGNAEbdGIAL1+ZD2OukiUdWiHc8wWXDiPyif+yOCAY6b65aB4que/xA
+eTbkbu0igI7QTS77UoEiocLtCjnIvoRTu4yBBA/bsiaMs8ksjYKP3UQxcz7xa4Wv
+uP8919x8vKsq8nndHCqwN8ic293BrtzgV/wJhAdERLaz3p1pj2n7GpsMTvlRugVy
+GQcW7rytR5w61Lvt+vcOjbf559HerQ7a/XObGBZ0v6zSJCr5Vw8dbcCGWDWZjKmK
+WZ27A6LEIkoq9dLbDEcG0BPTtsYa84PtC/O6a3xWgkjKgRuicZUNSxHdUUy+K/Qh
+8wIDAQAB
+-----END PUBLIC KEY-----";
+
+	const ubyte[SHA256_DIGEST_LENGTH/*32*/] dgst = sha256Of(msg);
+
+	ubyte[] uPublicKey = cast(ubyte[])publicKey;
+	BIO* bio = BIO_new_mem_buf(uPublicKey.ptr, cast(int)uPublicKey.length);
+	assert(bio !is null, "new buff error");
+	RSA* rsa = null;
+	rsa = PEM_read_bio_RSA_PUBKEY(bio, &rsa,null,null);
+	assert(rsa !is null, "rsa is error");
+	uint siglen = RSA_size(rsa);
+	ubyte[] sigret = Base64.decode(encryptedMsg);
+	// 标准PKCS#1 v1.5 RSA RSA_PKCS1_PADDING
+	auto status = RSA_verify(NID_sha256, dgst.ptr,cast(uint)SHA256_DIGEST_LENGTH, sigret.ptr, siglen, rsa);
+	writeln("status:", status);
+	writeln("string:",sigret);
 	RSA_free(rsa);
 	BIO_free(bio);
 }
